@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: #0A0A0A;
+    --color-surface: #1A1D24;
+    --color-neon: #C0FF00;
+  }
+
+  html.lenis, html.lenis body {
+    height: auto;
+  }
+
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+
+  .lenis.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+  }
+
+  .lenis.lenis-stopped {
+    overflow: hidden;
+  }
+
+  .lenis.lenis-scrolling iframe {
+    pointer-events: none;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-surface/60 backdrop-blur-xl border border-glass-border;
+  }
+  
+  .btn-neon {
+    @apply bg-neon text-bg px-8 py-4 rounded-full font-bold hover:shadow-neon-glow transition-all active:scale-95 flex items-center justify-center;
+  }
+  
+  .btn-glass {
+    @apply glass px-8 py-4 rounded-full font-bold hover:bg-white/5 transition-all active:scale-95 flex items-center justify-center;
+  }
+
+  .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(3, minmax(180px, auto));
+    @apply gap-6;
+  }
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

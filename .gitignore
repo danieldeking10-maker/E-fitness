@@ -1,0 +1,9 @@
+node_modules
+.next
+.qodo
+.kombai
+dist
+coverage
+*.log
+.env
+.env.*

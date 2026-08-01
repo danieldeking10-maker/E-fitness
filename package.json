@@ -1,0 +1,15 @@
+{
+  "name": "e-fitness",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @e-fitness/web --silent & npm run dev -w @e-fitness/api --silent",
+    "build": "npm run build -w @e-fitness/web --silent && npm run build -w @e-fitness/api --silent",
+    "smoke:test:api": "node scripts/smoke-test-api.mjs"
+  }
+}
+
