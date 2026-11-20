@@ -1,15 +1,19 @@
 {
   "name": "e-fitness",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.1.0",
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w @e-fitness/web --silent & npm run dev -w @e-fitness/api --silent",
-    "build": "npm run build -w @e-fitness/web --silent && npm run build -w @e-fitness/api --silent",
-    "smoke:test:api": "node scripts/smoke-test-api.mjs"
+    "dev": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspace=apps/web",
+    "start": "npm run start --workspace=apps/web",
+    "lint": "npm run lint --workspace=apps/web"
+  },
+  "dependencies": {
+    "@google/genai": "^2.26.0",
+    "@types/three": "^0.187.0",
+    "three": "^0.187.0"
   }
 }
-

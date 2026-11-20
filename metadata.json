@@ -1,0 +1,8 @@
+{
+  "name": "E-fitness",
+  "description": "E-fitness merges cutting-edge neural analysis with elite coaching to transform your physical potential.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

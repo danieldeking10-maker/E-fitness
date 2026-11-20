@@ -1,12 +1,10 @@
 'use client';
 
-import Link from 'next/link';
-import { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, Mic, Settings, ArrowRight } from 'lucide-react';
-import gsap from 'gsap';
+import { useEffect, useRef, useState } from 'react';
+import { Send, Trash2, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getApiBaseUrl } from '@/lib/api';
-
+import { SiteNavbar } from '@/components/SiteNavbar';
 
 interface Message {
   id: string;
@@ -15,20 +13,26 @@ interface Message {
   timestamp: string;
 }
 
+const QUICK_PROMPTS = [
+  'How do I optimize sleep architecture after heavy training?',
+  'Calculate target daily protein and hydration intake',
+  'What are the best knee-friendly quad compound movements?',
+  'How do I identify and manage central nervous system fatigue?',
+];
+
 export default function WellnessCompanionPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       role: 'ai',
-      text: "Hello! I've analyzed your workout from earlier. Your heart rate recovery was exceptionally fast (32bpm in 60s). This suggests your cardiovascular base is improving.",
-      timestamp: '14:20',
+      text: 'Welcome back. I am your E-fitness Coaching Companion. Your biometrics and recovery targets are synced—ask about training periodization, sleep restoration, nutrition timing, or movement mechanics.',
+      timestamp: 'Ready',
     },
   ]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLElement>(null);
-  const footerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -36,34 +40,29 @@ export default function WellnessCompanionPage() {
     }
   }, [messages, loading]);
 
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      gsap.from(headerRef.current, {
-        y: -40,
-        opacity: 0,
-        duration: 1,
-        ease: 'expo.out',
-      });
-      gsap.from(footerRef.current, {
-        y: 40,
-        opacity: 0,
-        duration: 1,
-        ease: 'expo.out',
-        delay: 0.2,
-      });
-    });
-    return () => ctx.revert();
-  }, []);
+  const speakText = (text: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    if (!voiceEnabled) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.05;
+    utterance.pitch = 1.0;
+    window.speechSynthesis.speak(utterance);
+  };
 
-  const onSend = async (e?: React.FormEvent) => {
+  const onSend = async (e?: React.FormEvent, customText?: string) => {
     e?.preventDefault();
-    if (!inputValue.trim() || loading) return;
+    const query = (customText || inputValue).trim();
+    if (!query || loading) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
-      text: inputValue,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      text: query,
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -75,168 +74,194 @@ export default function WellnessCompanionPage() {
       const res = await fetch(`${baseUrl}/ai/wellness-companion/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg.text }),
+        body: JSON.stringify({
+          message: query,
+          history: messages.slice(-6).map((m) => ({ role: m.role, text: m.text })),
+        }),
       });
-      
+
       if (!res.ok) throw new Error('API request failed');
-      
       const data = await res.json();
-      
+      const replyText =
+        data.reply ||
+        'Protocol acknowledged. Focus on progressive overload and allow sufficient inter-set recovery.';
+
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'ai',
-        text: data.reply || "Based on your current fatigue markers, I recommend holding the intensity but adding one extra set to your primary lifts.",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        text: replyText,
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
       };
       setMessages((prev) => [...prev, aiMsg]);
+      if (voiceEnabled) {
+        speakText(replyText);
+      }
     } catch (err) {
       console.error(err);
-      setTimeout(() => {
-        setMessages((prev) => [...prev, {
-          id: (Date.now() + 1).toString(),
-          role: 'ai',
-          text: "I'm having a slight sync issue, but based on your profile, ensure you're hydrating properly today. Let's try again in a moment.",
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        }]);
-      }, 1000);
+      const fallbackMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        text: 'Hydration and sleep remain your primary restorative levers today. Aim for 2.0g protein/kg bodyweight and 8 hours of nocturnal slow-wave sleep.',
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      };
+      setMessages((prev) => [...prev, fallbackMsg]);
     } finally {
       setLoading(false);
     }
   };
 
+  const clearChat = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setMessages([
+      {
+        id: Date.now().toString(),
+        role: 'ai',
+        text: 'Conversation cleared. Ready for your next training or recovery inquiry.',
+        timestamp: 'Ready',
+      },
+    ]);
+  };
+
   return (
-    <main className="h-[100svh] flex flex-col bg-bg text-white selection:bg-neon selection:text-bg overflow-hidden relative">
-      {/* Top Bar */}
-      <header ref={headerRef} className="p-4 md:p-6 border-b border-white/5 flex items-center justify-between glass z-20">
-        <div className="flex items-center gap-3 md:gap-4">
-          <Link href="/" className="h-9 w-9 md:h-11 md:w-11 border border-white/10 rounded-full flex items-center justify-center text-zinc-500 hover:text-white transition-colors">
-            <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
-          </Link>
-          <div className="h-10 w-10 md:h-12 md:w-12 bg-neon rounded-2xl flex items-center justify-center text-bg font-black shadow-neon-glow transform -rotate-3">AI</div>
+    <div className="h-[100svh] flex flex-col bg-bg text-white selection:bg-neon selection:text-bg overflow-hidden">
+      <SiteNavbar />
+
+      {/* Sub-header for Companion controls */}
+      <div className="pt-16 border-b border-white/10 bg-[#0D0F14]">
+        <div className="max-w-4xl mx-auto px-6 py-3.5 flex items-center justify-between gap-4">
           <div>
-            <div className="font-heading font-bold text-xs md:text-sm tracking-tight">Wellness Companion</div>
-            <div className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 bg-neon rounded-full animate-pulse shadow-[0_0_8px_#C0FF00]"></span>
-              <span className="text-[9px] md:text-[10px] text-neon font-black uppercase tracking-[0.2em]">Neural Active</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button className="h-9 w-9 md:h-11 md:w-11 glass border-white/5 rounded-full flex items-center justify-center text-zinc-500 hover:text-white transition-colors">
-            <Settings className="w-4 h-4" />
-          </button>
-        </div>
-      </header>
-
-      {/* Chat Area */}
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 md:p-10 space-y-8 scroll-smooth scrollbar-hide no-scrollbar"
-      >
-        <div className="max-w-3xl mx-auto space-y-12 pb-10">
-          <div className="text-center py-10 opacity-50">
-             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[8px] md:text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em]">
-               Precision Coaching Matrix Engaged
-             </div>
+            <h1 className="font-heading font-bold text-base md:text-lg tracking-tight text-white">
+              Wellness Performance Companion
+            </h1>
+            <p className="text-[11px] font-mono text-zinc-400">
+              Exercise Science · Recovery & Nutrition Guidance
+            </p>
           </div>
 
-          {messages.map((msg) => (
-            <div 
-              key={msg.id} 
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setVoiceEnabled(!voiceEnabled)}
               className={cn(
-                "flex flex-col max-w-[90%] md:max-w-[75%] animate-in fade-in slide-in-from-bottom-4 duration-700",
-                msg.role === 'user' ? "items-end ml-auto" : "items-start"
+                'h-9 px-3.5 rounded-full border text-xs font-bold flex items-center gap-1.5 transition-colors',
+                voiceEnabled
+                  ? 'bg-neon/15 border-neon/40 text-neon'
+                  : 'bg-white/[0.04] border-white/10 text-zinc-300 hover:text-white'
+              )}
+              title={voiceEnabled ? 'Voice readout active' : 'Enable voice readout'}
+            >
+              {voiceEnabled ? (
+                <Volume2 className="w-4 h-4" />
+              ) : (
+                <VolumeX className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">
+                {voiceEnabled ? 'Voice On' : 'Voice Off'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={clearChat}
+              className="h-9 w-9 border border-white/10 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-colors bg-white/[0.04]"
+              title="Clear conversation"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Chat Messages */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto px-4 md:px-8 py-6 scrollbar-hide"
+      >
+        <div className="max-w-3xl mx-auto space-y-6 pb-4">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={cn(
+                'flex flex-col',
+                msg.role === 'user' ? 'items-end' : 'items-start'
               )}
             >
-              <div 
+              <div className="flex items-center gap-2 mb-1.5 px-1 font-mono text-[10px] uppercase tracking-widest text-zinc-400 tabular">
+                <span>
+                  {msg.role === 'user' ? 'Athlete' : 'E-fitness Coach'}
+                </span>
+                <span>· {msg.timestamp}</span>
+              </div>
+
+              <div
                 className={cn(
-                  "p-5 md:p-7 rounded-[2.5rem] text-sm md:text-[15px] leading-relaxed relative group transition-all duration-500",
-                  msg.role === 'ai' 
-                    ? "bg-zinc-900/60 border border-white/5 rounded-tl-none hover:border-neon/20" 
-                    : "bg-neon text-bg font-black rounded-tr-none shadow-neon-glow"
+                  'p-5 rounded-3xl max-w-[88%] text-sm leading-relaxed whitespace-pre-wrap',
+                  msg.role === 'user'
+                    ? 'bg-white/10 border border-white/15 text-white rounded-tr-none'
+                    : 'bg-surface/95 border border-neon/25 text-zinc-200 rounded-tl-none'
                 )}
               >
                 {msg.text}
-                <div className={cn(
-                  "absolute opacity-0 group-hover:opacity-60 transition-opacity text-[8px] md:text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 py-2",
-                  msg.role === 'ai' ? "left-1 -bottom-8" : "right-1 -bottom-8"
-                )}>
-                  SYNCED {msg.timestamp}
-                </div>
               </div>
             </div>
           ))}
 
           {loading && (
-            <div className="flex flex-col items-start max-w-[85%] animate-in fade-in slide-in-from-left-4 duration-500">
-              <div className="bg-zinc-900/40 border border-white/5 p-6 rounded-[2rem] rounded-tl-none">
-                <div className="flex gap-2">
-                  <div className="h-1.5 w-1.5 bg-neon rounded-full animate-bounce shadow-neon-glow" style={{ animationDelay: '0ms' }}></div>
-                  <div className="h-1.5 w-1.5 bg-neon rounded-full animate-bounce shadow-neon-glow" style={{ animationDelay: '150ms' }}></div>
-                  <div className="h-1.5 w-1.5 bg-neon rounded-full animate-bounce shadow-neon-glow" style={{ animationDelay: '300ms' }}></div>
-                </div>
+            <div className="flex flex-col items-start">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 mb-1.5 px-1">
+                Reviewing Exercise Physiology...
+              </div>
+              <div className="bg-surface/90 px-5 py-4 rounded-3xl rounded-tl-none border border-white/10 text-zinc-300 text-sm">
+                Formulating physiological recommendation...
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Footer Input */}
-      <footer ref={footerRef} className="p-4 md:p-10 relative z-20 glass border-t border-white/5">
-        <div className="max-w-3xl mx-auto space-y-8">
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide no-scrollbar mask-fade-right">
-            {[
-              'Recovery Protocol',
-              'Macro Analysis',
-              'Form Optimization',
-              'Next Session',
-              'Sleep Quality'
-            ].map(tag => (
-              <button 
-                key={tag} 
-                onClick={() => setInputValue(tag)}
-                className="glass px-6 py-3 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap hover:border-neon/50 hover:text-neon hover:bg-neon/5 transition-all duration-300"
+      {/* Input Footer */}
+      <footer className="p-4 md:p-5 border-t border-white/10 bg-[#0D0F14]">
+        <div className="max-w-3xl mx-auto space-y-3">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {QUICK_PROMPTS.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => onSend(undefined, prompt)}
+                className="px-4 py-2 rounded-full bg-white/[0.05] border border-white/10 text-xs text-zinc-300 hover:text-white hover:border-neon/40 whitespace-nowrap transition-colors shrink-0"
               >
-                {tag}
+                {prompt}
               </button>
             ))}
           </div>
-          
-          <form onSubmit={onSend} className="relative group">
-            <div className="absolute inset-0 bg-neon/10 blur-[40px] rounded-[3rem] opacity-0 group-focus-within:opacity-100 transition-opacity duration-1000"></div>
-            <input 
-              type="text" 
-              placeholder="Query your companion..." 
+
+          <form onSubmit={onSend} className="relative flex items-center">
+            <input
+              type="text"
+              placeholder="Ask about recovery, hypertrophy, nutrition timing, or movement form..."
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              className="w-full bg-black/60 border border-white/10 rounded-[2.5rem] px-8 md:px-10 py-6 md:py-8 text-sm md:text-base outline-none focus:border-neon/50 transition-all shadow-2xl relative z-10 pr-32 placeholder:text-zinc-600" 
+              className="w-full bg-black/60 border border-white/15 rounded-full px-6 py-3.5 text-sm outline-none focus:border-neon/60 transition-colors pr-14 placeholder:text-zinc-500"
             />
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-3 md:gap-4 z-20">
-               <button type="button" className="h-12 w-12 md:h-14 md:w-14 text-zinc-600 hover:text-neon transition-colors flex items-center justify-center">
-                 <Mic className="w-5 h-5 md:w-6 md:h-6" />
-               </button>
-               <button 
-                 type="submit" 
-                 disabled={!inputValue.trim() || loading}
-                 className="h-12 w-12 md:h-14 md:w-14 bg-neon text-bg rounded-2xl flex items-center justify-center font-black hover:scale-105 active:scale-95 transition-all disabled:opacity-20 disabled:grayscale shadow-neon-glow"
-               >
-                 <ArrowRight className="w-6 h-6 md:w-7 md:h-7" />
-               </button>
-            </div>
+            <button
+              type="submit"
+              disabled={!inputValue.trim() || loading}
+              aria-label="Send message"
+              className="absolute right-1.5 h-10 w-10 bg-neon text-bg rounded-full flex items-center justify-center font-bold hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:scale-100"
+            >
+              <Send className="w-4 h-4" />
+            </button>
           </form>
-
-          <div className="flex items-center justify-center gap-10 opacity-30">
-             <span className="h-px flex-1 bg-zinc-800"></span>
-             <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-[0.4em] whitespace-nowrap">
-               E-fitness AI v2.4.0
-             </p>
-             <span className="h-px flex-1 bg-zinc-800"></span>
-          </div>
         </div>
       </footer>
-
-      {/* Ambient background */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-neon/[0.03] blur-[150px] rounded-full -z-10 pointer-events-none"></div>
-    </main>
+    </div>
   );
 }
